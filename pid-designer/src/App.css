@@ -35,19 +35,69 @@ button:active {
 }
 
 .react-flow__handle {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background-color: #555;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s, background-color 0.2s;
+  z-index: 10;
 }
 
 .react-flow__handle:hover {
-  background-color: #0066ff;
+  transform: scale(1.5);
+  cursor: crosshair;
+  z-index: 20;
+}
+
+/* Make connection points more visible with different colors */
+.react-flow__handle-left, .react-flow__handle-right {
+  background-color: #e74c3c !important; /* horizontal connections */
+}
+
+.react-flow__handle-left:hover, .react-flow__handle-right:hover {
+  background-color: #ff6b6b !important;
+}
+
+.react-flow__handle-top, .react-flow__handle-bottom {
+  background-color: #2ecc71 !important; /* vertical connections */
+}
+
+.react-flow__handle-top:hover, .react-flow__handle-bottom:hover {
+  background-color: #5cdb95 !important;
 }
 
 .react-flow__edge-path {
   stroke: #333;
   stroke-width: 2;
+}
+
+/* Style for vertical and horizontal connection lines */
+.react-flow__edge.vertical .react-flow__edge-path {
+  stroke: #2ecc71;
+  stroke-width: 2;
+}
+
+.react-flow__edge.horizontal .react-flow__edge-path {
+  stroke: #e74c3c;
+  stroke-width: 2;
+}
+
+/* Make edges easier to interact with */
+.react-flow__edge {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 3;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.2));
+}
+
+/* Selected edge styling */
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 3;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.3));
 }
 
 /* Controls styling */

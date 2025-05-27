@@ -43,16 +43,44 @@ export function Canvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
-
-  // Handle connecting nodes
+  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);  // Handle connecting nodes
   const onConnect = useCallback(
     (connection: Edge | Connection) => {
-      setEdges((eds) => addEdge({
+      // Determine if this is a vertical connection (top/bottom) or horizontal (left/right)
+      const sourceHandle = connection.sourceHandle || '';
+      const targetHandle = connection.targetHandle || '';
+      
+      const isVertical = 
+        sourceHandle.includes('top') || 
+        sourceHandle.includes('bottom') || 
+        targetHandle.includes('top') || 
+        targetHandle.includes('bottom');
+      
+      // Set edge type based on connection orientation
+      let edgeType = 'smoothstep';
+      let color = '#333';
+      
+      // Vertical connections in green, horizontal in red
+      if (isVertical) {
+        color = '#2ecc71';  // Green for vertical connections
+      } else {
+        color = '#e74c3c';  // Red for horizontal connections
+      }
+        setEdges((eds) => addEdge({
         ...connection,
-        type: 'smoothstep',
+        type: edgeType,
         animated: false,
-        style: { stroke: '#333', strokeWidth: 2 }
+        className: isVertical ? 'vertical' : 'horizontal',
+        style: { 
+          stroke: color, 
+          strokeWidth: 2 
+        },
+        data: { 
+          isVertical,
+          sourceHandle,
+          targetHandle
+        },
+        selected: false
       }, eds));
     },
     [setEdges]
@@ -198,10 +226,27 @@ export function Canvas() {
           snapToGrid={true}
           snapGrid={[10, 10]}
           fitView
-        >
-          <Background color="#aaa" gap={16} />
+        >          <Background color="#aaa" gap={16} />
           <Controls />
           <MiniMap />
+          
+          <Panel position="top-left">
+            <div style={{ 
+              backgroundColor: 'rgba(255, 255, 255, 0.8)', 
+              padding: '12px', 
+              borderRadius: '4px',
+              marginBottom: '10px',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+            }}>
+              <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', fontSize: '16px' }}>How to Use:</p>
+              <p style={{ margin: '0 0 6px 0' }}>• <b>Add elements</b>: Drag items from the toolbar to the canvas</p>
+              <p style={{ margin: '0 0 6px 0' }}>• <b>Connect elements</b>: Drag from one connection point to another</p>
+              <p style={{ margin: '0 0 6px 0' }}>• <b>Connection points</b>: Red dots (horizontal) and green dots (vertical)</p>
+              <p style={{ margin: '0 0 6px 0' }}>• <b>Save/Load</b>: Use the buttons to save or load your diagram</p>
+              <p style={{ margin: '0 0 6px 0' }}>• <b>Delete elements</b>: Select and press Delete key</p>
+            </div>
+          </Panel>
+          
           <Panel position="top-right">
             <div style={{ display: 'flex', gap: '10px', padding: '10px' }}>
               <button onClick={saveDiagram} style={{ padding: '8px 12px' }}>Save Diagram</button>

@@ -25,13 +25,14 @@ const ElementSvg = styled.svg`
 export const PIDElementNode = memo(({ data }: NodeProps) => {
   return (
     <NodeContainer>
-      <Handle type="target" position={Position.Left} style={{ background: '#555' }} />
+      <Handle id="left" type="target" position={Position.Left} style={{ background: '#e74c3c' }} />
+      <Handle id="right" type="source" position={Position.Right} style={{ background: '#e74c3c' }} />
+      <Handle id="top" type="target" position={Position.Top} style={{ background: '#2ecc71' }} />
+      <Handle id="bottom" type="source" position={Position.Bottom} style={{ background: '#2ecc71' }} />
       
       <ElementSvg width="40" height="40" viewBox="0 0 24 24">
-        <path d={data.svgPath || 'M12 12 m-8 0 a8 8 0 1 0 16 0 a8 8 0 1 0 -16 0'} />
+        <path d={data.svgPath || 'M12 12 m-8 0 a8 8 0 1,0 16 0 a8 8 0 1,0 -16 0'} />
       </ElementSvg>
-      
-      <Handle type="source" position={Position.Right} style={{ background: '#555' }} />
     </NodeContainer>
   );
 });
@@ -40,13 +41,20 @@ export const PIDElementNode = memo(({ data }: NodeProps) => {
 export const PipeNode = memo(({ data }: NodeProps) => {
   return (
     <NodeContainer>
-      <Handle type="target" position={Position.Left} style={{ background: '#555' }} />
-      <Handle type="source" position={Position.Right} style={{ background: '#555' }} />
-      <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
-      <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
-      
-      <ElementSvg width="40" height="40" viewBox="0 0 24 24">
-        <path d={data.svgPath || 'M2 12 H22'} />
+      <Handle id="left" type="target" position={Position.Left} style={{ background: '#e74c3c' }} />
+      <Handle id="right" type="source" position={Position.Right} style={{ background: '#e74c3c' }} />
+      <Handle id="top" type="target" position={Position.Top} style={{ background: '#2ecc71' }} />
+      <Handle id="bottom" type="source" position={Position.Bottom} style={{ background: '#2ecc71' }} />
+        <ElementSvg width="40" height="40" viewBox="0 0 24 24">
+        {data.svgPath ? (
+          <path d={data.svgPath} />
+        ) : (
+          <>
+            {/* Cross shape to indicate 4-way connection */}
+            <path d="M2 12 H22" />
+            <path d="M12 2 V22" />
+          </>
+        )}
       </ElementSvg>
     </NodeContainer>
   );
@@ -56,13 +64,14 @@ export const PipeNode = memo(({ data }: NodeProps) => {
 export const ValveNode = memo(({ data }: NodeProps) => {
   return (
     <NodeContainer style={{ width: '60px' }}>
-      <Handle type="target" position={Position.Left} style={{ background: '#555' }} />
+      <Handle id="left" type="target" position={Position.Left} style={{ background: '#e74c3c' }} />
+      <Handle id="right" type="source" position={Position.Right} style={{ background: '#e74c3c' }} />
+      <Handle id="top" type="target" position={Position.Top} style={{ background: '#2ecc71' }} />
+      <Handle id="bottom" type="source" position={Position.Bottom} style={{ background: '#2ecc71' }} />
       
       <ElementSvg width="60" height="40" viewBox="0 0 32 24">
         <path d={data.svgPath || 'M2 12 H8 L12 6 L16 18 L20 6 L24 18 H30'} />
       </ElementSvg>
-      
-      <Handle type="source" position={Position.Right} style={{ background: '#555' }} />
     </NodeContainer>
   );
 });
@@ -71,13 +80,14 @@ export const ValveNode = memo(({ data }: NodeProps) => {
 export const PumpNode = memo(({ data }: NodeProps) => {
   return (
     <NodeContainer style={{ width: '60px' }}>
-      <Handle type="target" position={Position.Left} style={{ background: '#555' }} />
+      <Handle id="left" type="target" position={Position.Left} style={{ background: '#e74c3c' }} />
+      <Handle id="right" type="source" position={Position.Right} style={{ background: '#e74c3c' }} />
+      <Handle id="top" type="target" position={Position.Top} style={{ background: '#2ecc71' }} />
+      <Handle id="bottom" type="source" position={Position.Bottom} style={{ background: '#2ecc71' }} />
       
       <ElementSvg width="60" height="40" viewBox="0 0 24 24">
         <path d={data.svgPath || 'M12,12 m-8,0 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0 M4 12 H0 M20 12 H24'} />
       </ElementSvg>
-      
-      <Handle type="source" position={Position.Right} style={{ background: '#555' }} />
     </NodeContainer>
   );
 });
@@ -86,7 +96,10 @@ export const PumpNode = memo(({ data }: NodeProps) => {
 export const InstrumentNode = memo(({ data }: NodeProps) => {
   return (
     <NodeContainer>
-      <Handle type="target" position={Position.Left} style={{ background: '#555' }} />
+      <Handle id="left" type="target" position={Position.Left} style={{ background: '#e74c3c' }} />
+      <Handle id="right" type="source" position={Position.Right} style={{ background: '#e74c3c' }} />
+      <Handle id="top" type="target" position={Position.Top} style={{ background: '#2ecc71' }} />
+      <Handle id="bottom" type="source" position={Position.Bottom} style={{ background: '#2ecc71' }} />
       
       <ElementSvg width="40" height="40" viewBox="0 0 24 24">
         <path d={data.svgPath} />
@@ -101,8 +114,6 @@ export const InstrumentNode = memo(({ data }: NodeProps) => {
           {data.label.substr(0, 2).toUpperCase()}
         </text>
       </ElementSvg>
-      
-      <Handle type="source" position={Position.Right} style={{ background: '#555' }} />
     </NodeContainer>
   );
 });
