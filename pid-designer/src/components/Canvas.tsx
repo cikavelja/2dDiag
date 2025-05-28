@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import ReactFlow, {
   ReactFlowProvider,
   Background,
@@ -10,7 +10,7 @@ import ReactFlow, {
   ConnectionLineType,
   Panel
 } from 'reactflow';
-import type { Edge, Connection, Node } from 'reactflow';
+import type { Edge, Connection, Node, ReactFlowInstance } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useDrop } from 'react-dnd';
 import styled from 'styled-components';
@@ -21,14 +21,34 @@ interface DragItem {
   svgPath?: string;
 }
 import { PIDElementNode, PipeNode, ValveNode, PumpNode, InstrumentNode } from './PIDNodes';
+import { 
+  HeatExchangerNode, 
+  TankNode, 
+  CompressorNode, 
+  ControlValveNode, 
+  ReactorNode, 
+  ColumnNode,
+  LabelNode
+} from './AdvancedPIDNodes';
+import { DiagramManager } from './DiagramManager';
+import { ExportPanel } from './ExportPanel';
+import { GridSettings } from './GridSettings';
+import { OpacityControl } from './OpacityControl';
+import { UndoRedoPanel } from './UndoRedoPanel';
 
-// Define node types
-const nodeTypes = {
+// Define node types outside of component (to avoid recreation on each render)
+const defaultNodeTypes = {
   pidElement: PIDElementNode,
   pipe: PipeNode,
   valve: ValveNode,
   pump: PumpNode,
-  instrument: InstrumentNode
+  instrument: InstrumentNode,
+  heatExchanger: HeatExchangerNode,
+  tank: TankNode,
+  compressor: CompressorNode,
+  controlValve: ControlValveNode,
+  reactor: ReactorNode,
+  column: ColumnNode,  label: LabelNode
 };
 
 const CanvasContainer = styled.div`
@@ -43,12 +63,113 @@ export function Canvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   // Add state to control instructions panel visibility
   const [showInstructions, setShowInstructions] = useState<boolean>(true);
   // Add state for selected edges
   const [selectedEdges, setSelectedEdges] = useState<Edge[]>([]);
+  // Add state for grid settings
+  const [snapToGrid, setSnapToGrid] = useState<boolean>(true);
+  const [snapGrid, setSnapGrid] = useState<[number, number]>([15, 15]);
+  const [showGrid, setShowGrid] = useState<boolean>(true);
+  // Add state for element opacity
+  const [elementOpacity, setElementOpacity] = useState<number>(1.0);
+  // Add undo/redo functionality
+  const [canUndo, setCanUndo] = useState<boolean>(false);
+  const [canRedo, setCanRedo] = useState<boolean>(false);
+  const [undoRedoStack, setUndoRedoStack] = useState<{ nodes: Node[]; edges: Edge[] }[]>([]);
+  const [currentStackIndex, setCurrentStackIndex] = useState<number>(-1);
 
+  // Memoize nodeTypes to prevent recreation on each render
+  const nodeTypes = useMemo(() => defaultNodeTypes, []);
+
+  // Add state change to the undo stack
+  const addToUndoStack = useCallback(() => {
+    // Only add to undo stack if there are changes
+    if (nodes.length > 0 || edges.length > 0) {
+      const newState = { nodes: [...nodes], edges: [...edges] };
+      
+      // If we're not at the end of the stack, truncate it
+      if (currentStackIndex < undoRedoStack.length - 1) {
+        setUndoRedoStack(prev => prev.slice(0, currentStackIndex + 1).concat(newState));
+      } else {
+        setUndoRedoStack(prev => [...prev, newState]);
+      }
+      
+      setCurrentStackIndex(prev => prev + 1);
+      setCanUndo(true);
+      setCanRedo(false);
+    }
+  }, [nodes, edges, currentStackIndex, undoRedoStack]);
+
+  // Handle undo action
+  const handleUndo = useCallback(() => {
+    if (currentStackIndex > 0) {
+      const prevState = undoRedoStack[currentStackIndex - 1];
+      setNodes(prevState.nodes);
+      setEdges(prevState.edges);
+      setCurrentStackIndex(prev => prev - 1);
+      setCanRedo(true);
+      
+      if (currentStackIndex - 1 === 0) {
+        setCanUndo(false);
+      }
+    }
+  }, [currentStackIndex, undoRedoStack, setNodes, setEdges]);
+
+  // Handle redo action
+  const handleRedo = useCallback(() => {
+    if (currentStackIndex < undoRedoStack.length - 1) {
+      const nextState = undoRedoStack[currentStackIndex + 1];
+      setNodes(nextState.nodes);
+      setEdges(nextState.edges);
+      setCurrentStackIndex(prev => prev + 1);
+      setCanUndo(true);
+      
+      if (currentStackIndex + 1 === undoRedoStack.length - 1) {
+        setCanRedo(false);
+      }
+    }
+  }, [currentStackIndex, undoRedoStack, setNodes, setEdges]);
+
+  // Initialize undo stack with empty state
+  useEffect(() => {
+    if (undoRedoStack.length === 0) {
+      setUndoRedoStack([{ nodes: [], edges: [] }]);
+      setCurrentStackIndex(0);
+    }
+  }, [undoRedoStack]);
+  
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check if target is an input field
+      if (event.target instanceof HTMLInputElement || 
+          event.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      
+      // Undo: Ctrl+Z
+      if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
+        event.preventDefault();
+        handleUndo();
+      }
+      
+      // Redo: Ctrl+Y or Ctrl+Shift+Z
+      if ((event.ctrlKey || event.metaKey) && 
+          (event.key === 'y' || (event.shiftKey && event.key === 'z'))) {
+        event.preventDefault();
+        handleRedo();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleUndo, handleRedo]);
+  
   // Handle connecting nodes
   const onConnect = useCallback(
     (connection: Edge | Connection) => {
@@ -100,42 +221,59 @@ export function Canvas() {
   // Handle dropping nodes onto canvas
   const onDrop = useCallback(
     (event: React.DragEvent) => {
-      event.preventDefault();
-
-      if (!reactFlowInstance || !reactFlowWrapper.current) return;
-
-      const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
-      const draggedData = JSON.parse(event.dataTransfer.getData('application/reactflow'));
+      event.preventDefault();      if (!reactFlowInstance || !reactFlowWrapper.current) return;
       
-      const position = reactFlowInstance.project({
-        x: event.clientX - reactFlowBounds.left,
-        y: event.clientY - reactFlowBounds.top,
+      // Safely parse the data with error handling
+      let draggedData;
+      try {
+        const dataString = event.dataTransfer.getData('application/reactflow');
+        draggedData = dataString ? JSON.parse(dataString) : null;
+      } catch (error) {
+        console.error('Error parsing drag data:', error);
+        return;
+      }
+      
+      // If we couldn't get the data, exit
+      if (!draggedData) return;
+      
+      // Use screenToFlowPosition instead of project
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
       });
 
-      // Determine node type based on element category
-      let nodeType = 'pidElement';
-      if (draggedData.type.includes('pipe')) {
-        nodeType = 'pipe';
-      } else if (draggedData.type.includes('valve')) {
-        nodeType = 'valve';
-      } else if (draggedData.type.includes('pump')) {
-        nodeType = 'pump';
-      } else if (draggedData.type.includes('indicator')) {
-        nodeType = 'instrument';
-      }      const newNode: Node = {
+      // Determine node type based on element category or explicit nodeType
+      let nodeType = draggedData.nodeType || 'pidElement';
+      
+      // If no explicit nodeType was provided, infer from the element type
+      if (!draggedData.nodeType) {
+        if (draggedData.type.includes('pipe')) {
+          nodeType = 'pipe';
+        } else if (draggedData.type.includes('valve')) {
+          nodeType = 'valve';
+        } else if (draggedData.type.includes('pump')) {
+          nodeType = 'pump';
+        } else if (draggedData.type.includes('indicator')) {
+          nodeType = 'instrument';
+        }
+      }
+      
+      const newNode: Node = {
         id: `${draggedData.type}-${Date.now()}`,
         type: nodeType,
         position,
         data: { 
           label: draggedData.label,
           type: draggedData.type,
-          svgPath: draggedData.svgPath
+          svgPath: draggedData.svgPath,
+          ...(draggedData.data || {}) // Spread any additional data
         },
       };
 
       setNodes((nds) => nds.concat(newNode));
+      addToUndoStack();
     },
-    [reactFlowInstance, setNodes]
+    [reactFlowInstance, setNodes, addToUndoStack]
   );
   // DnD support
   const dropTargetRef = useRef(null);
@@ -144,13 +282,13 @@ export function Canvas() {
     drop: (item: DragItem, monitor) => {
       if (!reactFlowInstance || !reactFlowWrapper.current) return;
       
-      const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
+      // Get bounds not needed when using screenToFlowPosition
       const clientOffset = monitor.getClientOffset();
-      
-      if (clientOffset) {
-        const position = reactFlowInstance.project({
-          x: clientOffset.x - reactFlowBounds.left,
-          y: clientOffset.y - reactFlowBounds.top,
+        if (clientOffset) {
+        // Use screenToFlowPosition instead of project
+        const position = reactFlowInstance.screenToFlowPosition({
+          x: clientOffset.x,
+          y: clientOffset.y,
         });
 
         // Determine node type based on element category
@@ -175,45 +313,36 @@ export function Canvas() {
         };
 
         setNodes((nds) => nds.concat(newNode));
+        addToUndoStack();
       }
     },
   });
-  
-  // Save diagram
-  const saveDiagram = () => {
-    if (reactFlowInstance) {
-      const flow = reactFlowInstance.toObject();
-      localStorage.setItem('pid-diagram', JSON.stringify(flow));
-      alert('Diagram saved successfully!');
-    }
-  };
-
-  // Load saved diagram
-  const loadSavedDiagram = () => {
-    const savedFlow = localStorage.getItem('pid-diagram');
-    if (savedFlow) {
-      const flow = JSON.parse(savedFlow);
-      setNodes(flow.nodes || []);
-      setEdges(flow.edges || []);
-      alert('Diagram loaded successfully!');
-    } else {
-      alert('No saved diagram found!');
-    }
-  };
+    // Auto-save functionality will be handled by the DiagramManager component
 
   // Clear canvas
   const clearCanvas = () => {
     if (window.confirm('Are you sure you want to clear the canvas?')) {
       setNodes([]);
       setEdges([]);
+      setUndoRedoStack([{ nodes: [], edges: [] }]);
+      setCurrentStackIndex(0);
     }
-  };
-  // Apply the drop ref to the container
+  };  // Apply the drop ref to the container
   useEffect(() => {
     if (dropTargetRef.current) {
       drop(dropTargetRef.current);
     }
   }, [drop]);
+  
+  // Apply opacity to all nodes
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((node) => ({
+        ...node,
+        style: { ...node.style, opacity: elementOpacity },
+      }))
+    );
+  }, [elementOpacity, setNodes]);
   
   // Handle edge selection
   const onEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
@@ -255,8 +384,9 @@ export function Canvas() {
       // Remove all selected edges
       setEdges(edges => edges.filter(edge => !selectedEdges.some(selectedEdge => selectedEdge.id === edge.id)));
       setSelectedEdges([]);
+      addToUndoStack();
     }
-  }, [selectedEdges, setEdges, setSelectedEdges]);
+  }, [selectedEdges, setEdges, setSelectedEdges, addToUndoStack]);
   
   // Handle click on the canvas/pane to deselect edges
   const onPaneClick = useCallback(() => {
@@ -289,15 +419,14 @@ export function Canvas() {
           onKeyDown={onKeyDown}
           onPaneClick={onPaneClick}
           connectionLineType={ConnectionLineType.SmoothStep}
-          snapToGrid={true}
-          snapGrid={[10, 10]}
+          snapToGrid={snapToGrid}
+          snapGrid={snapGrid}
           fitView
           edgesFocusable={true}
           selectNodesOnDrag={false}
-        >          <Background color="#aaa" gap={16} />
+        >          {showGrid && <Background color="#aaa" gap={snapGrid[0]} size={1} />}
           <Controls />
-          <MiniMap />
-            <Panel position="top-left">
+          <MiniMap />          <Panel position="top-left">
             {showInstructions && (
               <div style={{ 
                 backgroundColor: 'rgba(255, 255, 255, 0.8)', 
@@ -328,14 +457,16 @@ export function Canvas() {
                   }}
                 >
                   ✕
-                </button>
-                <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', fontSize: '16px' }}>How to Use:</p>
+                </button>                <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', fontSize: '16px' }}>How to Use:</p>
                 <p style={{ margin: '0 0 6px 0' }}>• <b>Add elements</b>: Drag items from the toolbar to the canvas</p>
                 <p style={{ margin: '0 0 6px 0' }}>• <b>Connect elements</b>: Drag from one connection point to another</p>
                 <p style={{ margin: '0 0 6px 0' }}>• <b>Connection points</b>: Red dots (horizontal) and green dots (vertical)</p>
                 <p style={{ margin: '0 0 6px 0' }}>• <b>Connection removal</b>: Click on connection and press Delete key</p>
                 <p style={{ margin: '0 0 6px 0' }}>• <b>Save/Load</b>: Use the buttons to save or load your diagram</p>
                 <p style={{ margin: '0 0 6px 0' }}>• <b>Delete elements</b>: Select and press Delete key</p>
+                <p style={{ margin: '0 0 6px 0' }}>• <b>Grid Settings</b>: Use the panel to adjust grid and snapping</p>
+                <p style={{ margin: '0 0 6px 0' }}>• <b>Undo/Redo</b>: Use Ctrl+Z (undo) and Ctrl+Y or Ctrl+Shift+Z (redo)</p>
+                <p style={{ margin: '0 0 6px 0' }}>• <b>Works offline</b>: This app works even when you're not connected to the internet</p>
               </div>
             )}
             {!showInstructions && (
@@ -355,10 +486,37 @@ export function Canvas() {
               </button>
             )}
           </Panel>
-          
-          <Panel position="top-right">            <div style={{ display: 'flex', gap: '10px', padding: '10px' }}>
-              <button onClick={saveDiagram} style={{ padding: '8px 12px' }}>Save Diagram</button>
-              <button onClick={loadSavedDiagram} style={{ padding: '8px 12px' }}>Load Diagram</button>
+            <Panel position="bottom-left">
+            <GridSettings
+              snapToGrid={snapToGrid}
+              setSnapToGrid={setSnapToGrid}
+              snapGrid={snapGrid}
+              setSnapGrid={setSnapGrid}
+              showGrid={showGrid}
+              setShowGrid={setShowGrid}
+            />
+            <OpacityControl
+              elementOpacity={elementOpacity}
+              setElementOpacity={setElementOpacity}
+            />
+          </Panel><Panel position="top-right">            
+            <div style={{ display: 'flex', gap: '10px', padding: '10px' }}>              <DiagramManager 
+                nodes={nodes} 
+                edges={edges} 
+                onLoadDiagram={(loadedNodes, loadedEdges) => {
+                  // Apply current opacity to loaded nodes
+                  const nodesWithOpacity = loadedNodes.map(node => ({
+                    ...node,
+                    style: { ...node.style, opacity: elementOpacity },
+                  }));
+                  setNodes(nodesWithOpacity);
+                  setEdges(loadedEdges);
+                }} 
+              />
+              <ExportPanel 
+                reactFlowInstance={reactFlowInstance} 
+                flowRef={reactFlowWrapper} 
+              />
               <button 
                 onClick={() => {
                   if (selectedEdges.length > 0) {
@@ -374,13 +532,18 @@ export function Canvas() {
                 disabled={selectedEdges.length === 0}
               >
                 Delete Selected
-              </button>
-              <button 
+              </button>              <button 
                 onClick={clearCanvas} 
                 style={{ padding: '8px 12px', backgroundColor: '#ffcccc' }}
               >
                 Clear Canvas
               </button>
+              <UndoRedoPanel 
+                canUndo={canUndo} 
+                canRedo={canRedo} 
+                onUndo={handleUndo} 
+                onRedo={handleRedo} 
+              />
             </div>
           </Panel>
         </ReactFlow>

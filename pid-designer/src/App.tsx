@@ -2,6 +2,8 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Toolbar } from './components/Toolbar';
 import { PidCanvas } from './components/Canvas';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import { OfflineNotification } from './components/OfflineNotification';
 import styled from 'styled-components';
 import './App.css'
 
@@ -49,6 +51,10 @@ function App() {
           <Toolbar />
           <PidCanvas />
         </Content>
+        
+        {/* PWA Components */}
+        <PWAInstallPrompt />
+        <OfflineNotification />
       </AppContainer>
     </DndProvider>
   );

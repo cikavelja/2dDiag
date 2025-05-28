@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { useDrag } from 'react-dnd';
 import styled from 'styled-components';
 
@@ -7,6 +7,8 @@ interface DragItem {
   type: string;      // must match NodeData.type
   label: string;
   svgPath?: string;  // SVG path for the element
+  nodeType?: string; // Type of the node to be created
+  data?: Record<string, any>; // Additional data for the node
 }
 
 const ItemContainer = styled.div`
@@ -36,12 +38,12 @@ const ItemIcon = styled.div`
   justify-content: center;
 `;
 
-export function ToolboxItem({ type, label, svgPath }: DragItem) {
+export function ToolboxItem({ type, label, svgPath, nodeType, data }: DragItem) {
   const containerRef = useRef<HTMLDivElement>(null);
   
   const [{ isDragging }, dragRef] = useDrag({
     type: 'PID_ELEMENT',
-    item: { type, label, svgPath },
+    item: { type, label, svgPath, nodeType, data },
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging()
     })
